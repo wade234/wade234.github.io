@@ -452,7 +452,7 @@
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    0
+                    2.2k
                 </div>
                 
 
@@ -472,7 +472,59 @@
 
         <div class="card-content article-card-content">
             <div id="articleContent">
-                
+                <p>web接口上的字符串文字通常在前端文件和后端二进制文件之间共享，以对用户输入进行编码。</p>
+<h2 id="Introduction"><a href="#Introduction" class="headerlink" title="Introduction"></a>Introduction</h2><ul>
+<li>web服务器接受来自前端的HTTP请求，并召唤后端二进制文件来处理它们。(类cgi文件)</li>
+<li>从嵌入式系统中查找bug的关键点是使用web服务的前端来定位处理用户提供的数据的后端代码。</li>
+<li>我们的见解是，处理用户输入的后端函数通常与相应的前端文件<strong>共享一个类似的关键字</strong>：在前端，用户输入被标记为一个关键字并编码在数据包中；在后端，使用相同或类似的关键字从数据包中提取用户输入。</li>
+<li>传统污点分析的三个优化：<ol>
+<li>首先，基于物联网固件的特点，我们开发了一个粗粒度的污染引擎，它包含了针对特定函数的特殊规则，以平衡效率和准确性。</li>
+<li>其次，我们通过输入引导和跟踪合并来加快路径探索，从而利用调用图和sink函数来优化搜索空间。</li>
+<li>最后，为了处理特定函数（如sanitizer函数）中的无限路径问题，我们使用了一种优先级算法来有效地处理循环。</li>
+</ol>
+</li>
+<li>综上所述，我们做出了以下贡献：<ol>
+<li>我们提出了一种新的技术，它利用嵌入式系统的前端和后端之间的公共关键字来定位后端二进制文件中的数据输入。</li>
+<li>我们设计并实现了利用粗粒度污染分析和跟踪合并方法来有效地检测嵌入式系统中的漏洞的SaTC。</li>
+<li>我们对39个真实的固件样本进行了SaTC评估，发现了33个未知的错误，包括命令注入、缓冲区溢出和不正确的访问控制错误。</li>
+</ol>
+</li>
+</ul>
+<h2 id="Observation"><a href="#Observation" class="headerlink" title="Observation"></a>Observation</h2><ul>
+<li>我们的直觉是，web界面中显示的字符串通常用于前端文件和后端函数：在前端，用户输入用关键字标记并编码在数据包中；在后端，使用相同或类似的关键字从数据包中提取用户输入。有了这些共享的关键字，我们就可以连接到前端和后端，并从后者中识别出输入处理函数。从这些函数开始，我们可以执行静态数据流分析，并有效地识别可利用的错误。</li>
+<li>具体来说，我们基于以下三个原则从后端和前端提取字符串：<ol>
+<li>我们选择用于编码发送到后端的网络包中的用户输入的前端字符串。具体来说，字符串是网络包中的一些“key”，其形式为……&amp;key&#x3D;value&amp;…我们在前端手动触发尽可能多的动作，以覆盖更多的请求消息。</li>
+<li>我们选择用于从消息中提取输入数据的后端字符串。基于我们对物联网固件的了解，我们定义了几个通常用于获取输入值的函数，例如示例中的websGetVar。我们收集这些函数的常量字符串参数作为感兴趣的后端字符串。</li>
+<li>我们取一个收集前端和后端字符串的交集。对于交集中的每个字符串，我们对前端的相关数据进行变异，以触发发送到后端的请求消息，并检查后端相关变量的值</li>
+</ol>
+</li>
+</ul>
+<h2 id="Our-Approaches"><a href="#Our-Approaches" class="headerlink" title="Our  Approaches"></a>Our  Approaches</h2><img src="C:\Users\DW\Desktop\SaTC.png" alt="SaTC" style="zoom: 67%;" />
+
+<p>在本文中，我们设计了SaTC来解决上述挑战，以有效地检测嵌入式系统中的常见漏洞。上图提供了我们的系统的概述，该系统以一个固件示例（即整个固件映像）作为输入，并生成各种bug报告。作为第一步，SaTC使用现成的固件解包器来解包固件映像，比如binwalk。从解包的映像中，它可以根据文件类型识别前端文件和后端程序：HTML、JavaScript和XML文件通常是前端文件，而可执行的二进制文件和库是后端文件。然后，SaTC分析前端文件，并利用典型的模式来提取潜在的用户输入的关键字。例如，deviceName、target和goform&#x2F;setUsbUnload将被识别为输入关键字。</p>
+<p>之后，SaTC将识别后端中的边界二进制文件，它将根据用户输入的关键字调用不同的处理函数。从这些函数中，我们尝试找到提取用户输入的点。为了找到与用户输入相关的隐式入口点，我们进一步将我们的直觉应用于多个后端程序：用户输入可以通过共享的关键字从一个程序传递到另一个程序。这有助于我们跟踪二进制文件之间的隐式数据依赖关系。最后，我们使用对输入敏感的污点分析来跟踪不可信数据的使用情况。我们设计了几种优化方法，使传统的污点分析在嵌入式系统上高效，包括粗粒度污染传播、输入引导的路径选择和跟踪合并技术。当SaTC发现用户输入在任何预定义的sink函数中使用时，比如作为系统调用的参数，它会收集路径约束并判断可达性。如果sink是可到达的，而输入有微弱的约束，SaTC发出了对该潜在漏洞的警报。</p>
+<h2 id="Input-Keyword-Extraction"><a href="#Input-Keyword-Extraction" class="headerlink" title="Input Keyword Extraction"></a>Input Keyword Extraction</h2><p>我们根据关键字在后端的使用情况将其分类为两种类型：一种类型用于标记用户输入，如deviceName，我们称它们为<em>parameter keywords</em>；另一种类型是标记处理函数，如setUsbUnload，我们称之为<em>action keywords</em>。</p>
+<p>我们考虑前端文件的三种而类别： HTML files, XML files, and JavaScript files：</p>
+<ul>
+<li><strong>HTML files</strong>: 由于HTML文件具有标准格式，因此我们使用正则表达式来提取关键字，如id、name和action attributes的值。action attributes的值被视为 action keywords。</li>
+<li><strong>XML files</strong>: 基于XML的服务，如简单对象访问协议(SOAP)和通用即插即用协议(UPnP)，通常在其XML文件中使用固定的格式来标记输入数据。因此，我们只需要做一个预分析，然后使用正则表达式来提取关键字。XML主体中的一级标签的名称被视为action keywords。</li>
+<li><strong>JavaScript files</strong>: JavaScript的格式不断变化，因此正则表达式不能正确识别关键字。因此，我们将一个JavaScript文件解析为一个抽象的语法树(AST)，并扫描每个Literal node，以从值属性中提取值。如果Literal node包含符号&#x2F;，我们将该字符串作为action keyword。我们进一步搜索所有CallExpression nodes，以找到使用典型应用程序编程接口(API)作为调用节点的节点，如sendSOAPAction。匹配节点的API方法或参数也被视为action keywords。</li>
+</ul>
+<p>为了过滤无效的关键字，我们根据我们的经验设计了一些规则：</p>
+<ul>
+<li>首先，我们删除带有特殊字符的字符串，例如！和@，当前端生成HTTP请求时将转义。</li>
+<li>第二，如果一个字符串以&#x3D;结尾，我们保留左手部分，放弃右边。符号&#x3D;通常便于连接参数和变量。</li>
+<li>第三，我们过滤掉小于阈值的字符串（我们在工作中使用5），因为参数关键字和动作关键字通常有非平凡的名称。</li>
+</ul>
+<p>为了降低后续模块的复杂性，我们使用两种启发式方法来从关键字集中识别并排除它们：</p>
+<ul>
+<li>如果一个JavaScript文件被许多HTML文件引用，那么我们将其视为一个公共的共享库，就像一个图表库一样。</li>
+<li>如果一个关键字被多个前端文件引用，如Button和Cancel，那么它可能是一个通用的字符串，而不是一个输入关键字。</li>
+</ul>
+<p>边界二进制文件识别：我们从每个后端二进制文件中提取字符串，并尝试将它们与输入的候选关键字进行匹配。我们将具有最大匹配关键字的二进制文件作为边界二进制文件。</p>
+<h2 id="Input-Entry-Recognition"><a href="#Input-Entry-Recognition" class="headerlink" title="Input Entry Recognition"></a>Input Entry Recognition</h2><p>在接收到来自前端的请求后，web服务器调用相应的处理函数来解析输入数据。数据提取点是后续分析的目标，我们将其定义为<em>input entry</em>,<em>input entry</em>识别模块根据对前端关键字的引用来检测后端二进制文件中的入口点。</p>
+<h3 id="Keyword-Reference-Locator"><a href="#Keyword-Reference-Locator" class="headerlink" title="Keyword Reference  Locator"></a><strong>Keyword Reference  Locator</strong></h3><p><img src="C:\Users\DW\Desktop\SaTC_1.png" alt="SaTC_1"></p>
+<h3 id="Implicit-Entry-Finder"><a href="#Implicit-Entry-Finder" class="headerlink" title="Implicit Entry Finder"></a><strong>Implicit Entry Finder</strong></h3><h3 id="Cross-Process-Entry-Finder"><a href="#Cross-Process-Entry-Finder" class="headerlink" title="Cross-Process Entry Finder"></a><strong>Cross-Process Entry Finder</strong></h3>
                 
             </div>
             <hr/>
@@ -972,7 +1024,7 @@
             <br>
             
             &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
-                class="white-color">75</span>&nbsp;字
+                class="white-color">2.3k</span>&nbsp;字
             
             
             
