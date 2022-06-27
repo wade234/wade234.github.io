@@ -452,7 +452,7 @@
                 
                 <div class="info-break-policy">
                     <i class="far fa-file-word fa-fw"></i>文章字数:&nbsp;&nbsp;
-                    2.2k
+                    4.2k
                 </div>
                 
 
@@ -499,7 +499,7 @@
 </ol>
 </li>
 </ul>
-<h2 id="Our-Approaches"><a href="#Our-Approaches" class="headerlink" title="Our  Approaches"></a>Our  Approaches</h2><img src="C:\Users\DW\Desktop\SaTC.png" alt="SaTC" style="zoom: 67%;" />
+<h2 id="Our-Approaches"><a href="#Our-Approaches" class="headerlink" title="Our  Approaches"></a>Our  Approaches</h2><img src="F:\MyBlog\MyBlog\themes\hexo-theme-matery\source\medias\pic\satc\SaTC.png" alt="SaTC" style="zoom:67%;" />
 
 <p>在本文中，我们设计了SaTC来解决上述挑战，以有效地检测嵌入式系统中的常见漏洞。上图提供了我们的系统的概述，该系统以一个固件示例（即整个固件映像）作为输入，并生成各种bug报告。作为第一步，SaTC使用现成的固件解包器来解包固件映像，比如binwalk。从解包的映像中，它可以根据文件类型识别前端文件和后端程序：HTML、JavaScript和XML文件通常是前端文件，而可执行的二进制文件和库是后端文件。然后，SaTC分析前端文件，并利用典型的模式来提取潜在的用户输入的关键字。例如，deviceName、target和goform&#x2F;setUsbUnload将被识别为输入关键字。</p>
 <p>之后，SaTC将识别后端中的边界二进制文件，它将根据用户输入的关键字调用不同的处理函数。从这些函数中，我们尝试找到提取用户输入的点。为了找到与用户输入相关的隐式入口点，我们进一步将我们的直觉应用于多个后端程序：用户输入可以通过共享的关键字从一个程序传递到另一个程序。这有助于我们跟踪二进制文件之间的隐式数据依赖关系。最后，我们使用对输入敏感的污点分析来跟踪不可信数据的使用情况。我们设计了几种优化方法，使传统的污点分析在嵌入式系统上高效，包括粗粒度污染传播、输入引导的路径选择和跟踪合并技术。当SaTC发现用户输入在任何预定义的sink函数中使用时，比如作为系统调用的参数，它会收集路径约束并判断可达性。如果sink是可到达的，而输入有微弱的约束，SaTC发出了对该潜在漏洞的警报。</p>
@@ -523,8 +523,64 @@
 </ul>
 <p>边界二进制文件识别：我们从每个后端二进制文件中提取字符串，并尝试将它们与输入的候选关键字进行匹配。我们将具有最大匹配关键字的二进制文件作为边界二进制文件。</p>
 <h2 id="Input-Entry-Recognition"><a href="#Input-Entry-Recognition" class="headerlink" title="Input Entry Recognition"></a>Input Entry Recognition</h2><p>在接收到来自前端的请求后，web服务器调用相应的处理函数来解析输入数据。数据提取点是后续分析的目标，我们将其定义为<em>input entry</em>,<em>input entry</em>识别模块根据对前端关键字的引用来检测后端二进制文件中的入口点。</p>
-<h3 id="Keyword-Reference-Locator"><a href="#Keyword-Reference-Locator" class="headerlink" title="Keyword Reference  Locator"></a><strong>Keyword Reference  Locator</strong></h3><p><img src="C:\Users\DW\Desktop\SaTC_1.png" alt="SaTC_1"></p>
-<h3 id="Implicit-Entry-Finder"><a href="#Implicit-Entry-Finder" class="headerlink" title="Implicit Entry Finder"></a><strong>Implicit Entry Finder</strong></h3><h3 id="Cross-Process-Entry-Finder"><a href="#Cross-Process-Entry-Finder" class="headerlink" title="Cross-Process Entry Finder"></a><strong>Cross-Process Entry Finder</strong></h3>
+<h3 id="Keyword-Reference-Locator"><a href="#Keyword-Reference-Locator" class="headerlink" title="Keyword Reference  Locator"></a><strong>Keyword Reference  Locator</strong></h3><p><img src="F:\MyBlog\MyBlog\themes\hexo-theme-matery\source\medias\pic\satc\SaTC_1.png" alt="SaTC_1"></p>
+<ul>
+<li><p>Ski表示一个完全等于一个输入关键字ki的字符串，或者包含一个名为ki的子字符串</p>
+</li>
+<li><p>以输入关键字作为参数的函数调用L</p>
+</li>
+<li><p>调用以操作关键字和函数指针作为参数的P。</p>
+</li>
+<li><p>如果参数关键字的一些参考点L在这些处理程序函数内部，我们将优先探索L。</p>
+</li>
+</ul>
+<h3 id="Implicit-Entry-Finder"><a href="#Implicit-Entry-Finder" class="headerlink" title="Implicit Entry Finder"></a><strong>Implicit Entry Finder</strong></h3><p><img src="F:\MyBlog\MyBlog\themes\hexo-theme-matery\source\medias\pic\satc\SaTC_2.png" alt="SaTC_2"></p>
+<ul>
+<li>如果我们已经确定了一个输入项L，另一个函数调用foo将被认为是另一个输入项，只要foo具有与L相似的代码模式。我们在这里称缺失的关键字pi为隐式关键字。</li>
+</ul>
+<h3 id="Cross-Process-Entry-Finder"><a href="#Cross-Process-Entry-Finder" class="headerlink" title="Cross-Process Entry Finder"></a><strong>Cross-Process Entry Finder</strong></h3><ul>
+<li>在数据流分析过程中，我们发现一些输入数据流可能在过程边界中断。幸运的是，我们可以再次应用我们的见解来连接跨不同流程的数据流：数据保存位置和数据提取位置通常共享相同的关键字。</li>
+</ul>
+<h2 id="Input-Sensitive-Taint-Analysis"><a href="#Input-Sensitive-Taint-Analysis" class="headerlink" title="Input Sensitive Taint Analysis"></a>Input Sensitive Taint Analysis</h2><h3 id="Coarse-Grained-Taint-Engine"><a href="#Coarse-Grained-Taint-Engine" class="headerlink" title="Coarse-Grained  Taint Engine"></a>Coarse-Grained  Taint Engine</h3><ul>
+<li><p>**Taint Source:**污点源可以是目标函数的变量或参数,字符串devicename被用作函数WebsGetVar的参数，因此它的内存位置将被设置为污染源。SaTC可以方便地获取用户输入数据的数据流。</p>
+</li>
+<li><p>**Taint Specification:**为了适当地处理函数调用，我们首先将函数划分为以下类别：summarizable function, general</p>
+<p>function, and nested function</p>
+<ol>
+<li>Summarizable function:内存级别操作的标准库函数，SaTC把它当成指令，根据语义应用污点规则</li>
+<li>General function:只包含Sunmmarizable function,不包含函数调用，SaTC则进入函数体，跟踪数据流</li>
+<li>Nested function:其他函数，SaTC直接把参数的属性直接传播给计算的结果，有返回值则给返回值参数的属性，没有则污染函数参数的属性</li>
+</ol>
+</li>
+</ul>
+<p><img src="F:\MyBlog\MyBlog\themes\hexo-theme-matery\source\medias\pic\satc\SaTC_4.png" alt="SaTC_4"></p>
+<p>算法伪代码：</p>
+<p><img src="F:\MyBlog\MyBlog\themes\hexo-theme-matery\source\medias\pic\satc\SaTC_3.png" alt="SaTC_3"></p>
+<h3 id="Efficient-Path-Exploration"><a href="#Efficient-Path-Exploration" class="headerlink" title="Efficient Path Exploration"></a>Efficient Path Exploration</h3><p>SaTC专注于检测两类漏洞：内存泄露和命令注入。检测前一个，我们首先在二进制中找到memcpy-like函数，并将它们视为sink函数。然后，如果攻击控制的数据不安全地达到一个sink函数，比如没有被消毒，我们就会发出警报。为了检测后一类漏洞，我们检索了保护sink函数的条件。然后，我们检查攻击者是否可以构造一个概念证明(PoC)来绕过约束。如果是这样，我们就会发出警报。</p>
+<ul>
+<li><p><strong>Sensitive Trace Guiding:<strong>SaTC在搜索任何路径之前，会先搜索每个目标的</strong>sink call trace</strong>。<strong>sink call trace</strong>表示调用图中从输入项到潜在的sink函数的函数调用序列。SaTC根据一个函数的调用树搜索该函数的<strong>sink call trace</strong>，该调用树将该函数作为根节点。如果一个函数不包含call trace，则没有从该函数到sink的可达路径。SaTC将从目标集合中删除此函数内的所有输入条目。在探索过程中，SaTC会检查每个函数调用指令，以查看目标是否属于call trace。如果是这样，我们将探索函数主体。</p>
+</li>
+<li><p>**Call Trace Merging:**一个输入条目可能会有大量的call trace，其中许多call trace共享一些公共路径。为了减少分析工作，SaTC尽可能地将call traces与相同的输入项合并。具体来说，我们首先根据所有traces的起点和输入关键字对其进行聚类。其次，我们将call traces中的所有函数划分为两类：sink函数和guiding函数，并记录函数调用指令的类型和地址。引导函数表示sink call traces中的sink函数的主导者。在探索过程中，当我们遇到一个跳转到guiding函数的调用指令后，SaTC将进入该函数中进行细粒度分析。否则，它就进行粗粒度分析。</p>
+<p><img src="F:\MyBlog\MyBlog\themes\hexo-theme-matery\source\medias\pic\satc\SaTC_5.png" alt="SaTC_5"></p>
+</li>
+</ul>
+<h3 id="Path-Prioritization-Strategy"><a href="#Path-Prioritization-Strategy" class="headerlink" title="Path Prioritization Strategy"></a>Path Prioritization Strategy</h3><p>在我们的评估过程中，我们发现一些特定的功能对路径探索的准确性和效率有显著的影响。例如，sanitizer函数可能导致无限循环，而Parser函数可能引入欠污染问题[34]。为了减轻这些特定功能的负面影响，我们识别它们并应用特殊的规则。具体来说，如果1)一个函数至少包含一个循环；2)函数的比较指令的数量大于阈值；3)比较指令的部分可以限制函数参数指向的内存区域的内容（即值），我们将其视为类似memcmp的函数。根据信息保存的数量，我们可以将这些功能分为两类：Parsers和Sanitizers。</p>
+<ul>
+<li>**Parsers:**解析器函数通常包含一个循环，如图3中的funcA。如果变量s1不受约束，则总有一条从默认语句到for循环的头的路径。在这些路径中，只有那些通过第一个用例语句（第5行）的路径会在函数之外传播污染。换句话说，缺少这些路径的分析会错误地确定用户输入不能影响变量s2和以后的执行路径。SaTC使用与KARONTE相同的解决方案来解决这个问题，它可以优先那些在函数中可能传播污染到函数之外的路径。</li>
+<li>**Sanitizers:**消毒剂功能可以清除恶意数据，或者警告潜在的威胁。考虑图5中的示例，以过滤特定的字符串，例如？，Netgear在类似系统的函数之前插入一个消毒剂函数FUN_7b83c。它包含一个对user_input的复杂检查（第7行）。同时循环和比较操作会产生许多路径。但是，为了获得对user_input的完整约束，我们只对最长的路径感兴趣。</li>
+</ul>
+<p><img src="F:\MyBlog\MyBlog\themes\hexo-theme-matery\source\medias\pic\satc\SaTC_6.png" alt="SaTC_6"></p>
+<p>我们使用算法2来探索最长路径并得到约束条件。rootNode是该函数的起始基本块。首先，它使用Random_Walk_Search函数在有限的总时间内探索可到达的路径和基本块所看到的节点（第8行）。随机搜索从rootNode中随机选择一个后继节点，直到遇到leaf节点并记录leaf节点（第9行）。leafNode表示没有后继块的基本块或循环后边缘的源基本块。其次，它扫描所有的leafnode，如果其入度数大于阈值N，则将leafnode删除(第13行)。最后，它重新探索该函数并输出最长路径的约束条件（第17行）。如图5所示，复杂检查的另一个分支是一个leafNode。</p>
+<p><img src="F:\MyBlog\MyBlog\themes\hexo-theme-matery\source\medias\pic\satc\SaTC_7.png" alt="SaTC_7"></p>
+<h2 id="Implementation"><a href="#Implementation" class="headerlink" title="Implementation"></a>Implementation</h2><p>我们用大约9800行Python代码实现了原型系统。Input Keyword Extraction模块是基于标准的XML处理库和JavaScript解析库Js2Py[16]实现的。Input Entry Reconition模块是基于Ghidra库和扩展的KARONTE的CPF实现的，它涵盖了与NVRAM[10]共享的污染变量。Input Sensitive Taint Analysis是建立在一个多架构的二进制分析框架angr[38]之上的。路径选择部分是基于Ghidra库[31]实现的。为了使SaTC更适用于MIPS体系结构，我们修复了angr的二进制加载器和KARONTE的寄存器误用问题。现在，原型系统支持多种架构，包括x86、ARM和MIPS。</p>
+<h2 id="Discussion"><a href="#Discussion" class="headerlink" title="Discussion"></a>Discussion</h2><ol>
+<li>后端从数据包提取数据不一定要有关键字，D-Link823G的固件使用功能apmib_set和apmib_get，在不同的功能之间共享数据，而不使用任何关键字。get和set函数可以是一种隐式模式。</li>
+<li>函数有关键字通过关键字匹配，没有关键字通过函数相似性匹配。（用karote方法识别输入源函数：源函数的特征）</li>
+<li>污点数据存在依赖性，也可以减少input entry数量</li>
+<li>cgi-bins不只一个，可以从嵌入式开发的角度开始</li>
+<li>固件的其他特征去找优化方法</li>
+</ol>
+
                 
             </div>
             <hr/>
@@ -755,18 +811,17 @@
 <article id="prenext-posts" class="prev-next articles">
     <div class="row article-row">
         
-        <div class="article col s12 m6" data-aos="fade-up" data-aos="fade-up">
+        <div class="article col s12 m6" data-aos="fade-up">
             <div class="article-badge left-badge text-color">
-                <i class="far fa-dot-circle"></i>&nbsp;本篇
-            </div>
+                <i class="fas fa-chevron-left"></i>&nbsp;上一篇</div>
             <div class="card">
-                <a href="/2022/06/24/satc/">
+                <a href="/2022/06/24/cgi-bins/">
                     <div class="card-image">
                         
                         
-                        <img src="/medias/featureimages/13.jpg" class="responsive-img" alt="SaTC">
+                        <img src="/medias/featureimages/23.jpg" class="responsive-img" alt="CGI bins">
                         
-                        <span class="card-title">SaTC</span>
+                        <span class="card-title">CGI bins</span>
                     </div>
                 </a>
                 <div class="card-content article-content">
@@ -776,9 +831,9 @@
                         
                     </div>
                     <div class="publish-info">
-                            <span class="publish-date">
-                                <i class="far fa-clock fa-fw icon-date"></i>2022-06-24
-                            </span>
+                        <span class="publish-date">
+                            <i class="far fa-clock fa-fw icon-date"></i>2022-06-24
+                        </span>
                         <span class="publish-author">
                             
                             <i class="fas fa-user fa-fw"></i>
@@ -787,7 +842,6 @@
                         </span>
                     </div>
                 </div>
-
                 
             </div>
         </div>
@@ -1024,7 +1078,7 @@
             <br>
             
             &nbsp;<i class="fas fa-chart-area"></i>&nbsp;站点总字数:&nbsp;<span
-                class="white-color">2.3k</span>&nbsp;字
+                class="white-color">4.3k</span>&nbsp;字
             
             
             
